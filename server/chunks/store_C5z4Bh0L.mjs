@@ -1,0 +1,33 @@
+globalThis.process ??= {};
+globalThis.process.env ??= {};
+import { getSession } from "./auth_BXoLTJDQ.mjs";
+import { storeCatalog, myApps, listReviews, rateApp, setListed } from "./store_BMHpQvMQ.mjs";
+import { env } from "cloudflare:workers";
+const prerender = false;
+const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json" } });
+const POST = async ({ request, locals }) => {
+  const ses = await getSession(env, request);
+  if (!ses) return json({ error: "ログインが必要" }, 401);
+  const b = await request.json().catch(() => ({}));
+  if (b._action === "catalog") return json({ ok: true, apps: await storeCatalog(env) });
+  if (b._action === "mine") {
+    if (ses.role !== "admin" || ses.ctx !== "org") return json({ error: "管理者のみ" }, 403);
+    return json({ ok: true, apps: await myApps(env) });
+  }
+  if (b._action === "reviews") return json({ ok: true, reviews: await listReviews(env, String(b.appId ?? "")) });
+  if (b._action === "rate") return json(await rateApp(env, String(b.appId ?? ""), Number(b.rating) || 0, b.body));
+  if (b._action === "set_listed") {
+    if (ses.role !== "admin" || ses.ctx !== "org") return json({ error: "管理者のみ" }, 403);
+    return json(await setListed(env, String(b.appId ?? ""), !!b.listed, String(b.minEntitlement ?? "free")));
+  }
+  return json({ error: "不明な操作" }, 400);
+};
+const _page = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
+  __proto__: null,
+  POST,
+  prerender
+}, Symbol.toStringTag, { value: "Module" }));
+const page = () => _page;
+export {
+  page
+};

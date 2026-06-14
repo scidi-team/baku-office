@@ -1,0 +1,36 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // 【配布用テンプレート】顧客が Deploy ボタンで自分のCFアカウントへ展開する単一Worker（§3）。
+  // リソースID は記載しない＝CFが複製先アカウントに自動作成してバインド。
+  "name": "baku-office",
+  // v13：ビルド成果物は server/（entry.mjs + chunks・事前バンドル）と client/（静的アセット）に分離。
+  //   no_bundle=true でビルド済モジュールをそのまま展開＝顧客側に node_modules / ビルド不要。
+  //   base_dir=./server でモジュール探索を server 配下に限定（client のJSをWorkerに取り込まない）。
+  "main": "./server/entry.mjs",
+  "base_dir": "./server",
+  "no_bundle": true,
+  "rules": [{ "type": "ESModule", "globs": ["**/*.js", "**/*.mjs"] }],
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "binding": "ASSETS", "directory": "./client" },
+  "observability": { "enabled": true },
+
+  // 自動プロビジョニング（公式推奨）：id・名前を省略し binding のみ。Deploy時にCFが自動作成する。
+  // KVは単一（LICENSE）に集約：複数KVの自動命名が衝突（already exists）するのを避けるため。
+  //   ファイルは LICENSE に "f/" prefix で保存（storage.ts の mediaKv フォールバック）。
+  //   Astro session は未使用のため SESSION KV も不要（コードは独自HMACセッション）。
+  "d1_databases": [{ "binding": "DB", "migrations_dir": "migrations","database_id": "1eb542fa-f7f8-4c3f-9db6-119d89488f3c","database_name": "baku-office" }],
+  "kv_namespaces": [
+    { "binding": "LICENSE","id": "9eb6dc7c924b42759a47a517d4264e7a" }
+  ],
+
+  "vars": {
+    // 当社ホストポータル（ライセンス取得・統合チェック・ログイン中継・検証鍵配布）。
+    "HOST_BASE_URL": "https://baku-office-portal.baku-027.workers.dev"
+  }
+  // アクティベートは「アプリを開いて Google でログイン」（申込メールと突合）。secret/var の追加入力は不要。
+  // ★ secret 投入は不要：MASTER_KEY は初回自動生成（団体のKVに保存）、ライセンス検証鍵はホストから自動取得、
+  //   組織ログインは当社ホスト経由の中継（団体側のGoogle設定不要）。
+  // AIを使う場合のみ、デプロイ後に管理画面「連携設定」で Gemini／（Pro）LINE・Claude のAPIキーを登録。
+  // R2（高度モード・任意）：[[r2_buckets]] binding=MEDIA_R2（カード必要・§11）。
+}
